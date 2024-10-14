@@ -4,6 +4,10 @@
 
 This application leverages the power of Vertex AI Agents API and the Imagen text-to-image model, to generate presentations based on a user-provided topic. 
 
+|[Sample PDF](./LearningtoLearn.pdf)|[Try in Notebook](./Notebook.ipynb)| [Try Locally](https://github.com/krishnaji/presento/tree/main?tab=readme-ov-file#getting-started)|
+|-|-|-|
+
+
 ![](Learn2Learn.gif)
 
 ## Features
