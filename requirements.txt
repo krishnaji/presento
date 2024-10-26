@@ -1,4 +1,3 @@
-google_cloud_aiplatform
 gradio==4.43.0
 fastapi==0.112.4	
 gradio-client==1.3.0

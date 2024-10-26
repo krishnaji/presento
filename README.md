@@ -41,6 +41,9 @@ This application leverages the power of Vertex AI Agents API and the Imagen text
    ```
 3. **Run the Application:**
    ```bash
-   gradio app.py 
+   gradio main.py 
    ```
-
+4. **Deploy to Cloud Run**
+```bash 
+gcloud run deploy presento  --project <PROJECT_ID>  --port 8080 --region us-central1 --min-instances 1
+```
