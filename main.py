@@ -28,7 +28,7 @@ logging.basicConfig(filename='presentation_generation.log', level=logging.INFO,
                     format='%(asctime)s - %(levelname)s - %(message)s')
 
 
-PROJECT_ID = "genai-380800" 
+PROJECT_ID = "<your-project-id>" 
 LOCATION = "us-central1" 
 vertexai.init(project=PROJECT_ID, location=LOCATION)
 
