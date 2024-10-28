@@ -9,6 +9,17 @@ from reportlab.lib.styles import getSampleStyleSheet
 from io import BytesIO
 import time
 import base64
+from pydub import AudioSegment
+import os
+import platform
+
+if platform.system() == 'Darwin':  # macOS
+    os.environ['PATH'] += os.pathsep + '/opt/homebrew/bin/'
+elif platform.system() == 'Linux':  # Ubuntu or other Linux
+    os.environ['PATH'] += os.pathsep + '/usr/bin/' 
+    # Common locations for ffmpeg on Ubuntu are /usr/bin/ or /usr/local/bin/
+else:
+    print("Unsupported operating system")
 
 import gradio as gr
 import logging
@@ -17,7 +28,7 @@ logging.basicConfig(filename='presentation_generation.log', level=logging.INFO,
                     format='%(asctime)s - %(levelname)s - %(message)s')
 
 
-PROJECT_ID = "<your-project-id>" 
+PROJECT_ID = "genai-380800" 
 LOCATION = "us-central1" 
 vertexai.init(project=PROJECT_ID, location=LOCATION)
 
@@ -40,10 +51,29 @@ json_converter_app = agents.create(display_name="JSON Converter", model=MODEL,in
   }, ...
 ]
 ```""")
+
+podcast_generator_app = agents.create( 
+    display_name="Podcast Generator",
+    model=MODEL,
+    instruction=""" You are an expert podcast host interviewing an expert guest about the provided topic slides.  You are indicated by |* and the guest expert is indicated by |+.  Include disfluencies like uh, likely, "you know" to make it appear you know each other. Always explicitly state who is speaking at the beginning of each dialogue turn. The podcast conversation should be about the provided topic slides. Generate a full and elaborate podcast conversation between the host and the guest with at least 20 turns. Sound exciting and fun.
+    <constraints>
+    Do not use names for host and guest.
+    </constraints>
+    Example podcast conversation:
+    |* host speaker statatement or question
+    |+ guest speaker comment and response
+    |* host speaker statatement or question
+    |+ guest speaker comment and response
+   
+    """
+)
+
 imagen_model = ImageGenerationModel.from_pretrained(IMAGE_MODEL)
 
 
 pdf_file = "slides.pdf"
+audio_file = "podcast.mp3"
+
 def generate_presentation(query: str, num_refinement_rounds: int = 2, progress=gr.Progress()):
     """Generates a presentation based on a query."""
     try:
@@ -97,6 +127,13 @@ def generate_presentation(query: str, num_refinement_rounds: int = 2, progress=g
         progress(0.9, desc="Creating PDF...")
         create_pdf(slide_data_with_images, pdf_file)
 
+        progress(0.95, desc="Generating podcast...")
+        podcast_session = sessions.create()
+        time.sleep(4)
+        podcast_text = podcast_session.create_run(agent=podcast_generator_app, content=f"Generate a podcast conversation about: {cleaned_json_string}").steps[-1].content.parts[0].text
+        logging.info(f"Generated Podcast Text: {podcast_text}")
+        synthesize_podcast(podcast_text)
+
         progress(1, desc="Done!")
         
         # delete sessions.
@@ -104,8 +141,9 @@ def generate_presentation(query: str, num_refinement_rounds: int = 2, progress=g
         slide_refiner_session.delete()
         json_converter_session.delete()
         image_description_session.delete()
+        podcast_session.delete()
 
-        return gr.File(pdf_file)
+        return gr.File(pdf_file), gr.File(audio_file)
 
     except Exception as e:
         logging.exception(f"An unexpected error occurred: {e}")  
@@ -194,11 +232,77 @@ def create_pdf(slide_data, pdf_file):
     return pdf_file
 
 
+def synthesize_text(text, voice_name="en-US-Journey-D", output_file="output.mp3"):
+    """Synthesizes speech from the input string of text."""
+    from google.cloud import texttospeech
+
+    client = texttospeech.TextToSpeechClient()
+
+    input_text = texttospeech.SynthesisInput(text=text)
+
+    voice = texttospeech.VoiceSelectionParams(
+        language_code="en-US",
+        name=voice_name, 
+        ssml_gender=texttospeech.SsmlVoiceGender.FEMALE,
+    )
+
+    audio_config = texttospeech.AudioConfig(
+        audio_encoding=texttospeech.AudioEncoding.MP3
+    )
+
+    response = client.synthesize_speech(
+        request={"input": input_text, "voice": voice, "audio_config": audio_config}
+    )
+
+    with open(output_file, "wb") as out:
+        out.write(response.audio_content)
+        print(f'Audio content written to file "{output_file}"')
+
+def synthesize_podcast(podcast_text):
+    """Synthesizes a podcast from the provided text using different voices for host and guest."""
+    audio_segments = []
+    current_speaker = None
+    current_text = ""
+
+    for line in podcast_text.split("\n"):
+        if line.startswith("|*"):
+            if current_speaker:
+                audio_segments.append(
+                    (current_text, current_speaker) 
+                )
+            current_speaker = "en-US-Journey-D"  # Host voice
+            current_text = line[2:].strip() 
+        elif line.startswith("|+"):
+            if current_speaker:
+                audio_segments.append(
+                    (current_text, current_speaker)
+                )
+            current_speaker = "en-US-Journey-O"  # Guest voice
+            current_text = line[2:].strip()
+        elif current_speaker: 
+            current_text += " " + line.strip()
+
+    if current_speaker:  # Add the last segment
+        audio_segments.append((current_text, current_speaker))
+
+    combined_audio = AudioSegment.empty()
+    for i, (text, voice_name) in enumerate(audio_segments):
+        output_file = f"segment_{i}.mp3"
+        synthesize_text(text, voice_name, output_file)
+        combined_audio += AudioSegment.from_mp3(output_file)
+
+    combined_audio.export(audio_file, format="mp3")
+    # Delete audio segments
+    for i in range(len(audio_segments)):
+        os.remove(f"segment_{i}.mp3")
+
+
+
 def gradio_generate_presentation(query, num_refinement_rounds=2, progress=gr.Progress()):
     return generate_presentation(query, num_refinement_rounds, progress)
 
 with gr.Blocks() as demo:
-    gr.Markdown("# Presento: AI Presentation Maker")
+    gr.Markdown("# Presento: AI Presentation and Podcast Maker")
     gr.HTML("""<br>""")
     with gr.Row():
         with gr.Column():
@@ -207,17 +311,19 @@ with gr.Blocks() as demo:
             submit_button = gr.Button("Generate Presentation")
 
         with gr.Column():
-            pdf_download = gr.File(label="Download Presentation", visible=True) 
+            pdf_download = gr.File(label="Download Presentation", visible=True)
+            audio_download = gr.File(label="Download Podcast (MP3)", visible=True) 
 
-    
+        # link to Github Repo
     gr.Markdown("### [Code Repository](https://github.com/krishnaji/presento)")
     gr.Markdown("### [Sample Presentation](https://github.com/krishnaji/sample-files/blob/main/GenAIUnittest.pdf)")
+    gr.Markdown("### [Sample Podcast](https://github.com/krishnaji/sample-files/blob/main/podcast-big-bang-theory.mp3)")
 
 
     submit_button.click(
         fn=gradio_generate_presentation,
         inputs=[query_input, refinement_rounds_input],
-        outputs=[pdf_download]
+        outputs=[pdf_download, audio_download],
     )
-demo.queue(default_concurrency_limit=10)
+demo.queue(default_concurrency_limit=3)
 demo.launch(server_name="0.0.0.0", server_port=8080)
