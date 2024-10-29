@@ -12,7 +12,7 @@ This application leverages the power of Vertex AI Agents API and the Imagen text
 ![](Learn2Learn.gif)
 
 
-<video src="./podcast-big-bang-theory.mp4"  controls="controls"></video>
+[![podcast)](./podcast-img.jpg)](https://krishnaji.github.io/sample-files/podcast-big-bang-theory.mp4)
 
 ## Features
 

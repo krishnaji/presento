@@ -325,5 +325,5 @@ with gr.Blocks() as demo:
         inputs=[query_input, refinement_rounds_input],
         outputs=[pdf_download, audio_download],
     )
-demo.queue(default_concurrency_limit=3)
+demo.queue(default_concurrency_limit=1)
 demo.launch(server_name="0.0.0.0", server_port=8080)
