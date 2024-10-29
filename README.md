@@ -30,7 +30,15 @@ This application leverages the power of Vertex AI Agents API and the Imagen text
 
 
 ## Architecture
-
+```mermaid
+graph LR
+    A[User Input] --> B(Story Generation)
+    B --> C(Slide Generation & Refinement)
+    C --> D(JSON Conversion)
+    D --> E(Image Description & Generation)
+    E --> F(Podcast Generation)
+    F --> G(PDF and Podcast Generation)
+```
 1. **User Input:** The user provides a presentation topic through the Gradio interface.
 2. **Story Generation:** A Gemini agent generates a detailed story relevant to the topic.
 3. **Slide Generation & Refinement:** Another agent converts the story into a slide deck, which is then refined iteratively by a refinement agent.
