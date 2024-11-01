@@ -17,7 +17,7 @@ if platform.system() == 'Darwin':  # macOS
     os.environ['PATH'] += os.pathsep + '/opt/homebrew/bin/'
 elif platform.system() == 'Linux':  # Ubuntu or other Linux
     os.environ['PATH'] += os.pathsep + '/usr/bin/' 
-    # Common locations for ffmpeg on Ubuntu are /usr/bin/ or /usr/local/bin/
+
 else:
     print("Unsupported operating system")
 
