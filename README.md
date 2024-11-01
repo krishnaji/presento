@@ -64,3 +64,4 @@ graph LR
 ```bash 
 gcloud run deploy presento  --project <PROJECT_ID>  --port 8080 --region us-central1 --min-instances 1 
 ```
+```Please note some of the services here are either private preview,public preview and GA. Please refer documetaion for more details.```
